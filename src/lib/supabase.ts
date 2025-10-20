@@ -11,22 +11,32 @@ let supabase: any;
 if (isDevelopment) {
   // 创建一个模拟的Supabase客户端
   supabase = {
-    from: (table: string) => ({
-      select: (columns: string) => ({
-        order: (column: string, options?: any) => ({
-          limit: (count: number) => Promise.resolve({ data: [], error: null })
+    from: (table: string) => {
+      const resolved = Promise.resolve({ data: null, error: null });
+      const listResolved = Promise.resolve({ data: [], error: null });
+
+      const chainBuilder = () => ({
+        order: () => chainBuilder(),
+        limit: () => ({
+          single: () => resolved,
+          maybeSingle: () => resolved,
         }),
-        eq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
-        single: () => Promise.resolve({ data: null, error: null })
-      }),
-      insert: (data: any) => Promise.resolve({ data: null, error: null }),
-      update: (data: any) => ({
-        eq: (column: string, value: any) => Promise.resolve({ data: null, error: null })
-      }),
-      delete: () => ({
-        eq: (column: string, value: any) => Promise.resolve({ data: null, error: null })
-      })
-    })
+        eq: () => listResolved,
+        single: () => resolved,
+        maybeSingle: () => resolved,
+      });
+
+      return {
+        select: () => chainBuilder(),
+        insert: () => resolved,
+        update: () => ({
+          eq: () => resolved,
+        }),
+        delete: () => ({
+          eq: () => resolved,
+        }),
+      };
+    }
   };
 } else {
   if (!supabaseUrl || !supabaseAnonKey) {

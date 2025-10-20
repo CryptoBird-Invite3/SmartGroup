@@ -1,6 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useId, useState, useEffect, useMemo, useRef } from 'react';
 import { Copy, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+declare global {
+  interface Window {
+    TradingView?: any;
+    tvScriptPromise?: Promise<void>;
+  }
+}
 
 interface MemeToken {
   id: string;
@@ -36,13 +43,119 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
   const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
   const [aiExpanded, setAiExpanded] = useState(false);
-  const [timeframe, setTimeframe] = useState('1m');
+  const [timeframe, setTimeframe] = useState('1d');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [isTvReady, setIsTvReady] = useState(false);
+  const tvWidgetRef = useRef<any>(null);
+  const tvContainerRef = useRef<HTMLDivElement | null>(null);
+  const rawId = useId();
+  const tvContainerId = useMemo(
+    () => `tv-chart-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+    [rawId]
+  );
 
-  const timeframes = ['1s', '5s', '30s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
   // Add display constants for icon and symbol
   const DISPLAY_SYMBOL = 'PEPE';
   const DISPLAY_LOGO_URL = '/token_icons/21deed59dc9d05f4995f0ee947a9c753b14ca87f3950a4e3fe1ec1c09c8d462c.png';
+
+  const resolutionMap = useMemo<Record<string, string>>(
+    () => ({
+      '1m': '1',
+      '3m': '3',
+      '5m': '5',
+      '15m': '15',
+      '30m': '30',
+      '1h': '60',
+      '2h': '120',
+      '4h': '240',
+      '6h': '360',
+      '8h': '480',
+      '12h': '720',
+      '1d': 'D',
+      '3d': '3D',
+      '1w': '1W',
+      '1M': '1M',
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const container = document.getElementById(tvContainerId) as HTMLDivElement | null;
+    if (!container) return undefined;
+    tvContainerRef.current = container;
+    setIsTvReady(false);
+
+    const initWidget = () => {
+      const container = document.getElementById(tvContainerId) as HTMLDivElement | null;
+      if (!container || !window.TradingView) return;
+      tvContainerRef.current = container;
+      setIsTvReady(false);
+
+      tvWidgetRef.current = new window.TradingView.widget({
+        symbol: 'BINANCE:PEPEUSDT',
+        interval: resolutionMap[timeframe] ?? '60',
+        container_id: tvContainerId,
+        autosize: true,
+        theme: 'dark',
+        locale: 'zh_CN',
+        style: '1',
+        timezone: 'Etc/UTC',
+        allow_symbol_change: false,
+        hide_side_toolbar: false,
+        hide_top_toolbar: false,
+        withdateranges: true,
+        range: '100D',
+        studies: ['MACD@tv-basicstudies'],
+      });
+
+      tvWidgetRef.current.onChartReady?.(() => {
+        setIsTvReady(true);
+      });
+    };
+
+    if (window.TradingView) {
+      initWidget();
+      return () => {
+        tvWidgetRef.current?.remove?.();
+        tvWidgetRef.current = null;
+        setIsTvReady(false);
+      };
+    }
+
+    if (!window.tvScriptPromise) {
+      window.tvScriptPromise = new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://s3.tradingview.com/tv.js';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('TradingView script failed to load'));
+        document.head.appendChild(script);
+      });
+    }
+
+    window.tvScriptPromise
+      .then(() => {
+        initWidget();
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    return () => {
+      tvWidgetRef.current?.remove?.();
+      tvWidgetRef.current = null;
+      setIsTvReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tvContainerId]);
+
+  useEffect(() => {
+    if (!isTvReady || !tvWidgetRef.current) return;
+    const resolution = resolutionMap[timeframe] ?? '60';
+    const chart = tvWidgetRef.current.activeChart?.();
+    chart?.setResolution(resolution, () => {});
+  }, [isTvReady, timeframe, resolutionMap]);
 
   useEffect(() => {
     fetchTokenData();
@@ -182,8 +295,18 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
                   </button>
                 ))}
               </div>
-              <div className="h-[400px] flex items-center justify-center text-slate-500">
-                <TrendingUp size={48} className="opacity-20" />
+              <div className="h-[400px] relative rounded-lg overflow-hidden bg-slate-950/40">
+                <div
+                  ref={tvContainerRef}
+                  id={tvContainerId}
+                  className="absolute inset-0 w-full h-full"
+                />
+                {!isTvReady && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2">
+                    <TrendingUp size={36} className="opacity-20" />
+                    <span className="text-sm">Loading TradingView chart...</span>
+                  </div>
+                )}
               </div>
             </div>
 
