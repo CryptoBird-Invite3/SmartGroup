@@ -21,7 +21,7 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [selectedCommunity] = useState('币圈猎狗群'); // 移除未使用的setter
-  const [isWalletBound, setIsWalletBound] = useState(false);
+  const [isWalletBound] = useState(false);
   const [liveCampaigns, setLiveCampaigns] = useState<Campaign[]>([]);
   const [pastCampaigns, setPastCampaigns] = useState<Campaign[]>([]);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -106,9 +106,6 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
     }, 3000);
   };
 
-  const handleBindWallet = () => {
-    setIsWalletBound(true);
-  };
 
   const handleBotAdded = () => {
     setIsBotAdded(true);
@@ -207,14 +204,7 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                 <span className="text-white font-medium">{userName ?? '@shao rockey'}</span>
                 {isWalletBound ? (
                   <span className="text-slate-400 text-sm">0x1234...5678</span>
-                ) : (
-                  <button
-                    onClick={handleBindWallet}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Bind Wallet
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -310,14 +300,7 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                 <span className="text-white font-medium">{userName ?? '@shao rockey'}</span>
                 {isWalletBound ? (
                   <span className="text-slate-400 text-sm">0x1234...5678</span>
-                ) : (
-                  <button
-                    onClick={handleBindWallet}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Bind Wallet
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
 
