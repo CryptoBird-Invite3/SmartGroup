@@ -2,9 +2,10 @@
 
 CryptoBird 是一款“社群版本的Kaito”，让“嘴撸”赛道从推特走入以telegram为代表的社群。
 
-- CryptoBird会监控社群的Meme币发车信号和群成员的跟车订单，将群成员的交易手续费的80%返佣给群主，让群主的每一次发车信号都有所收获；
+- CryptoBird会使用AI技术分析出某个项目在社群中的讨论热度，给每一个社群打分，讨论热度越高的社群可以从项目奖池中瓜分越多奖励，为项目方/庄家提供有效的营销工具；
+- CryptoBird会使用AI技术将多个社群针对同一个Meme币的讨论进行总结，让忙碌的加密玩家快速了解该Meme币，不会被淹没在海量的社群消息中；
 - CryptoBird会跟踪社群中的Meme币喊单信号的未来表现，分析社群喊单的胜率，为加密玩家发现最值得追随的聪明社群；
-- CryptoBird会使用AI技术总结出某个项目在社群中的讨论热度，给数以万计的社群打分，讨论热度越高的社群可以从项目奖池中瓜分更多奖励，为项目方/庄家提供有效的营销工具。
+- CryptoBird会监控社群的Meme币发车信号和群成员的跟车订单，将群成员的交易手续费的80%返佣给群主，让群主的每一次发车信号都有所收获；
 
 # CryptoBird核心功能
 对于加密玩家：
@@ -16,34 +17,12 @@ CryptoBird 是一款“社群版本的Kaito”，让“嘴撸”赛道从推特�
 - 佣金数据看板：可以查看社群的佣金数据，社群的信号胜率，可以提现全部佣金；
 - AI-chat: 可以将社群消息导出发给AI助手，AI会进行总结。
 
-## 详细功能结构
-- 顶部导航与页面切换（`src/App.tsx`）
-  - Home：欢迎页与导航提示
-  - Leaderboard：社区排行榜（`src/pages/CommunityLeaderboard.tsx`）
-  - Token：Meme Token 详情（`src/pages/MemeTokenDetail.tsx`）
-  - Campaign：活动详情（`src/pages/CampaignDetail.tsx`）
-  - Dashboard：群主控制台（`src/pages/GroupOwnerDashboard.tsx`）
 
-- 社区排行榜（CommunityLeaderboard）
-  - Mock 数据驱动，展示成员数、胜率、24h 信号数、交易量等指标
-  - Treemap 网格卡片展示社区与指标值，卡片渐变与封面图可定制
-
-- Token 详情（MemeTokenDetail）
-  - 基本信息：市值、价格、流动性、24h 成交量等
-  - 群信号流（Group Signals）：支持“Leader Call”与跟随订单的时间线展示，可替换群头像与发起人
-  - AI Summary：静态 AI 文案折叠展示
-  - 快速交易面板：买卖页签与模板按钮（演示态，不进行链上交易）
-
-- 活动详情（CampaignDetail）
-  - 社区参赛列表与指标（Mindshare、胜率等）
-  - 讨论 Feed：AI 摘要、参与度分数与时间
-
-- 群主控制台（GroupOwnerDashboard）
-  - 登录模拟：Telegram 登录状态流转（3 秒模拟）
-  - Commission：佣金余额、历史提现弹窗、趋势图（佣金与信号量）
-  - Campaigns：进行中与已结束活动卡片，查看/报名操作入口
-  - Add Bot Guide：两步引导（添加 Bot 与授予权限），一键复制 Bot 名称
-  - AI Chat：懒加载 `chat-snail-sdk`，失败回退 `ai-chat-widget-sdk`，右下角悬浮聊天入口
+## 系统架构
+- Web端产品
+- 智能合约（使用Nora辅助编程）：记录群主可领取的 佣金金额 和 活动奖励，群主可以用绑定的钱包地址进行提现
+- telegram bot：订阅社群消息，推送消息到社群；
+- AI：AI总结，AI打分 
 
 ## 使用到的技术
 - 前端框架：React 18、TypeScript、Vite 5

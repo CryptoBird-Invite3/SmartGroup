@@ -30,6 +30,9 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
   const [isWalletBound] = useState(false);
   const [liveCampaigns, setLiveCampaigns] = useState<Campaign[]>([]);
   const [pastCampaigns, setPastCampaigns] = useState<Campaign[]>([]);
+  // Registration state and toast
+  const [registeredCampaigns, setRegisteredCampaigns] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showWithdrawHistory, setShowWithdrawHistory] = useState(false);
   const [, setIsBotAdded] = useState(false); // 只保留setter用于handleBotAdded函数
@@ -84,6 +87,13 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
   useEffect(() => {
     fetchCampaigns();
   }, []);
+
+  // Auto-hide registration toast
+  useEffect(() => {
+    if (!toastMessage) return;
+    const t = setTimeout(() => setToastMessage(null), 3000);
+    return () => clearTimeout(t);
+  }, [toastMessage]);
 
   useEffect(() => {
     const days = 30;
@@ -646,7 +656,14 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                       <button onClick={() => goCampaign?.()} className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
                         View
                       </button>
-                      <button className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+                      <button
+                        onClick={() => {
+                          setRegisteredCampaigns((prev) => new Set([...prev, campaign.id]));
+                          setToastMessage('Registration successful ，Please add bot to your group');
+                        }}
+                        disabled={registeredCampaigns.has(campaign.id)}
+                        className={`flex-1 py-2 text-white text-sm font-medium rounded-lg transition-colors ${registeredCampaigns.has(campaign.id) ? 'bg-slate-700 cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                      >
                         Register
                       </button>
                     </div>
