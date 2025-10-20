@@ -1,13 +1,16 @@
-import { useId, useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Copy, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
+import {
+  CandlestickSeries,
+  ColorType,
+  CrosshairMode,
+  createChart,
+  type ISeriesApi,
+} from 'lightweight-charts';
 import { supabase } from '../lib/supabase';
+import { STATIC_SERIES, type TimeframeKey } from '../mock/candles';
 
-declare global {
-  interface Window {
-    TradingView?: any;
-    tvScriptPromise?: Promise<void>;
-  }
-}
+type ChartApi = ReturnType<typeof createChart>;
 
 interface MemeToken {
   id: string;
@@ -43,119 +46,102 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
   const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
   const [aiExpanded, setAiExpanded] = useState(false);
-  const [timeframe, setTimeframe] = useState('1d');
+  const [timeframe, setTimeframe] = useState<TimeframeKey>('1d');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [isTvReady, setIsTvReady] = useState(false);
-  const tvWidgetRef = useRef<any>(null);
-  const tvContainerRef = useRef<HTMLDivElement | null>(null);
-  const rawId = useId();
-  const tvContainerId = useMemo(
-    () => `tv-chart-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`,
-    [rawId]
-  );
+  const [isChartReady, setIsChartReady] = useState(false);
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+  const chartApiRef = useRef<ChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
-  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
+  const timeframes: TimeframeKey[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
   // Add display constants for icon and symbol
   const DISPLAY_SYMBOL = 'PEPE';
   const DISPLAY_LOGO_URL = '/token_icons/21deed59dc9d05f4995f0ee947a9c753b14ca87f3950a4e3fe1ec1c09c8d462c.png';
 
-  const resolutionMap = useMemo<Record<string, string>>(
-    () => ({
-      '1m': '1',
-      '3m': '3',
-      '5m': '5',
-      '15m': '15',
-      '30m': '30',
-      '1h': '60',
-      '2h': '120',
-      '4h': '240',
-      '6h': '360',
-      '8h': '480',
-      '12h': '720',
-      '1d': 'D',
-      '3d': '3D',
-      '1w': '1W',
-      '1M': '1M',
-    }),
-    []
-  );
-
   useEffect(() => {
-    const container = document.getElementById(tvContainerId) as HTMLDivElement | null;
-    if (!container) return undefined;
-    tvContainerRef.current = container;
-    setIsTvReady(false);
+    const container = chartContainerRef.current;
+    if (!container) return;
 
-    const initWidget = () => {
-      const container = document.getElementById(tvContainerId) as HTMLDivElement | null;
-      if (!container || !window.TradingView) return;
-      tvContainerRef.current = container;
-      setIsTvReady(false);
+    setIsChartReady(false);
 
-      tvWidgetRef.current = new window.TradingView.widget({
-        symbol: 'BINANCE:PEPEUSDT',
-        interval: resolutionMap[timeframe] ?? '60',
-        container_id: tvContainerId,
-        autosize: true,
-        theme: 'dark',
-        locale: 'zh_CN',
-        style: '1',
-        timezone: 'Etc/UTC',
-        allow_symbol_change: false,
-        hide_side_toolbar: false,
-        hide_top_toolbar: false,
-        withdateranges: true,
-        range: '100D',
-        studies: ['MACD@tv-basicstudies'],
+    const chart = createChart(container, {
+      layout: {
+        background: { type: ColorType.Solid, color: '#020617' },
+        textColor: '#94a3b8',
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+      },
+      rightPriceScale: {
+        borderColor: '#1e293b',
+        textColor: '#cbd5f5',
+        visible: true,
+      },
+      timeScale: {
+        borderColor: '#1e293b',
+        timeVisible: true,
+        secondsVisible: timeframe === '1m' || timeframe === '5m',
+      },
+      crosshair: {
+        horzLine: { color: '#475569', labelBackgroundColor: '#22c55e' },
+        vertLine: { color: '#475569', labelBackgroundColor: '#22c55e' },
+        mode: CrosshairMode.Normal,
+      },
+      grid: {
+        horzLines: { color: '#1e293b' },
+        vertLines: { color: '#1e293b' },
+      },
+    });
+
+    chartApiRef.current = chart;
+
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
+      borderVisible: false,
+    });
+    candleSeriesRef.current = series;
+
+    const data = STATIC_SERIES[timeframe] ?? [];
+    series.setData(data);
+    chart.timeScale().fitContent();
+    setIsChartReady(true);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        const { width, height } = entry.contentRect;
+        chart.applyOptions({ width, height });
       });
+    });
 
-      tvWidgetRef.current.onChartReady?.(() => {
-        setIsTvReady(true);
-      });
-    };
-
-    if (window.TradingView) {
-      initWidget();
-      return () => {
-        tvWidgetRef.current?.remove?.();
-        tvWidgetRef.current = null;
-        setIsTvReady(false);
-      };
-    }
-
-    if (!window.tvScriptPromise) {
-      window.tvScriptPromise = new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://s3.tradingview.com/tv.js';
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('TradingView script failed to load'));
-        document.head.appendChild(script);
-      });
-    }
-
-    window.tvScriptPromise
-      .then(() => {
-        initWidget();
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+    resizeObserver.observe(container);
+    const { width, height } = container.getBoundingClientRect();
+    chart.applyOptions({ width, height });
 
     return () => {
-      tvWidgetRef.current?.remove?.();
-      tvWidgetRef.current = null;
-      setIsTvReady(false);
+      resizeObserver.disconnect();
+      chart.remove();
+      chartApiRef.current = null;
+      candleSeriesRef.current = null;
+      setIsChartReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tvContainerId]);
+  }, []);
 
   useEffect(() => {
-    if (!isTvReady || !tvWidgetRef.current) return;
-    const resolution = resolutionMap[timeframe] ?? '60';
-    const chart = tvWidgetRef.current.activeChart?.();
-    chart?.setResolution(resolution, () => {});
-  }, [isTvReady, timeframe, resolutionMap]);
+    const series = candleSeriesRef.current;
+    const chart = chartApiRef.current;
+    if (!series || !chart) return;
+
+    const data = STATIC_SERIES[timeframe] ?? STATIC_SERIES['1d'];
+    series.setData(data);
+    chart.applyOptions({
+      timeScale: {
+        secondsVisible: timeframe === '1m' || timeframe === '5m',
+      },
+    });
+    chart.timeScale().fitContent();
+  }, [timeframe]);
 
   useEffect(() => {
     fetchTokenData();
@@ -297,14 +283,13 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
               </div>
               <div className="h-[400px] relative rounded-lg overflow-hidden bg-slate-950/40">
                 <div
-                  ref={tvContainerRef}
-                  id={tvContainerId}
+                  ref={chartContainerRef}
                   className="absolute inset-0 w-full h-full"
                 />
-                {!isTvReady && (
+                {!isChartReady && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2">
                     <TrendingUp size={36} className="opacity-20" />
-                    <span className="text-sm">Loading TradingView chart...</span>
+                    <span className="text-sm">Loading chart...</span>
                   </div>
                 )}
               </div>
