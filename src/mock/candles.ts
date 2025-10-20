@@ -2,469 +2,100 @@ import type { CandlestickData, UTCTimestamp } from 'lightweight-charts';
 
 export type TimeframeKey = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w' | '1M';
 
+const POINTS_PER_SERIES = 100;
+const BASE_TIMESTAMP = 1_717_200_000;
+
+interface TimeframeConfig {
+  intervalSeconds: number;
+  basePrice: number;
+  volatility: number;
+  seed: number;
+}
+
+const timeframeConfigs: Record<TimeframeKey, TimeframeConfig> = {
+  '1m': { intervalSeconds: 60, basePrice: 0.00035, volatility: 0.16, seed: 11 },
+  '5m': { intervalSeconds: 300, basePrice: 0.00036, volatility: 0.12, seed: 23 },
+  '15m': { intervalSeconds: 900, basePrice: 0.00034, volatility: 0.1, seed: 37 },
+  '1h': { intervalSeconds: 3600, basePrice: 0.00032, volatility: 0.08, seed: 49 },
+  '4h': { intervalSeconds: 14_400, basePrice: 0.00031, volatility: 0.07, seed: 61 },
+  '1d': { intervalSeconds: 86_400, basePrice: 0.00029, volatility: 0.05, seed: 73 },
+  '1w': { intervalSeconds: 604_800, basePrice: 0.00027, volatility: 0.04, seed: 89 },
+  '1M': { intervalSeconds: 2_592_000, basePrice: 0.00025, volatility: 0.035, seed: 101 },
+};
+
+const roundPrice = (value: number) => Number(value.toFixed(8));
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const createSeededRandom = (seed: number) => {
+  let current = seed >>> 0;
+  return () => {
+    current = (1664525 * current + 1013904223) >>> 0;
+    return current / 2 ** 32;
+  };
+};
+
+const generateSeries = ({
+  intervalSeconds,
+  basePrice,
+  volatility,
+  seed,
+}: TimeframeConfig): CandlestickData[] => {
+  const random = createSeededRandom(seed);
+  const start = BASE_TIMESTAMP - intervalSeconds * POINTS_PER_SERIES;
+  const candles: CandlestickData[] = [];
+  let lastClose = basePrice;
+
+  for (let i = 0; i < POINTS_PER_SERIES; i += 1) {
+    const time = (start + i * intervalSeconds) as UTCTimestamp;
+    const direction = random() - 0.5;
+    const move = direction * volatility;
+    const openRaw = lastClose;
+    const closeRaw = Math.max(openRaw * (1 + move), basePrice * 0.3);
+
+    const highBase = Math.max(openRaw, closeRaw);
+    const lowBase = Math.min(openRaw, closeRaw);
+    const wickRange = 0.02 + random() * 0.03;
+    const highRaw = highBase * (1 + wickRange * random());
+    const lowRaw = Math.max(lowBase * (1 - wickRange * random()), basePrice * 0.1);
+
+    let high = roundPrice(Math.max(highRaw, openRaw, closeRaw));
+    let low = roundPrice(Math.min(lowRaw, openRaw, closeRaw));
+    let open = roundPrice(openRaw);
+    let close = roundPrice(closeRaw);
+
+    if (low > high) {
+      low = roundPrice(high * 0.98);
+    }
+
+    if (high <= low) {
+      high = roundPrice(low * 1.02);
+    }
+
+    open = clamp(open, low, high);
+    close = clamp(close, low, high);
+
+    candles.push({
+      time,
+      open,
+      high,
+      low,
+      close,
+    });
+
+    lastClose = closeRaw;
+  }
+
+  return candles;
+};
+
 export const STATIC_SERIES: Record<TimeframeKey, CandlestickData[]> = {
-  '1m': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00036,
-      low: 0.00034,
-      close: 0.00035,
-    },
-    {
-      time: 1717200060 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00037,
-      low: 0.00034,
-      close: 0.00036,
-    },
-    {
-      time: 1717200120 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00037,
-      low: 0.00033,
-      close: 0.00034,
-    },
-    {
-      time: 1717200180 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00038,
-      low: 0.00033,
-      close: 0.00037,
-    },
-    {
-      time: 1717200240 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.00039,
-      low: 0.00036,
-      close: 0.00038,
-    },
-    {
-      time: 1717200300 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00039,
-      low: 0.00035,
-      close: 0.00036,
-    },
-    {
-      time: 1717200360 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00041,
-      low: 0.00035,
-      close: 0.0004,
-    },
-    {
-      time: 1717200420 as UTCTimestamp,
-      open: 0.0004,
-      high: 0.00041,
-      low: 0.00038,
-      close: 0.00039,
-    },
-  ],
-  '5m': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00036,
-      low: 0.00034,
-      close: 0.00035,
-    },
-    {
-      time: 1717200300 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00038,
-      low: 0.00034,
-      close: 0.00037,
-    },
-    {
-      time: 1717200600 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.00038,
-      low: 0.00035,
-      close: 0.00036,
-    },
-    {
-      time: 1717200900 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.0004,
-      low: 0.00035,
-      close: 0.00039,
-    },
-    {
-      time: 1717201200 as UTCTimestamp,
-      open: 0.00039,
-      high: 0.0004,
-      low: 0.00037,
-      close: 0.00038,
-    },
-    {
-      time: 1717201500 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00042,
-      low: 0.00037,
-      close: 0.00041,
-    },
-    {
-      time: 1717201800 as UTCTimestamp,
-      open: 0.00041,
-      high: 0.00043,
-      low: 0.0004,
-      close: 0.00042,
-    },
-    {
-      time: 1717202100 as UTCTimestamp,
-      open: 0.00042,
-      high: 0.00043,
-      low: 0.00039,
-      close: 0.0004,
-    },
-  ],
-  '15m': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00035,
-      low: 0.00033,
-      close: 0.00034,
-    },
-    {
-      time: 1717200900 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00037,
-      low: 0.00033,
-      close: 0.00036,
-    },
-    {
-      time: 1717201800 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00037,
-      low: 0.00034,
-      close: 0.00035,
-    },
-    {
-      time: 1717202700 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00039,
-      low: 0.00034,
-      close: 0.00038,
-    },
-    {
-      time: 1717203600 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00041,
-      low: 0.00037,
-      close: 0.0004,
-    },
-    {
-      time: 1717204500 as UTCTimestamp,
-      open: 0.0004,
-      high: 0.00041,
-      low: 0.00038,
-      close: 0.00039,
-    },
-    {
-      time: 1717205400 as UTCTimestamp,
-      open: 0.00039,
-      high: 0.00042,
-      low: 0.00038,
-      close: 0.00041,
-    },
-    {
-      time: 1717206300 as UTCTimestamp,
-      open: 0.00041,
-      high: 0.00044,
-      low: 0.0004,
-      close: 0.00043,
-    },
-  ],
-  '1h': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00033,
-      high: 0.00034,
-      low: 0.00032,
-      close: 0.00033,
-    },
-    {
-      time: 1717203600 as UTCTimestamp,
-      open: 0.00033,
-      high: 0.00036,
-      low: 0.00032,
-      close: 0.00035,
-    },
-    {
-      time: 1717207200 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00037,
-      low: 0.00034,
-      close: 0.00036,
-    },
-    {
-      time: 1717210800 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00039,
-      low: 0.00035,
-      close: 0.00038,
-    },
-    {
-      time: 1717214400 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00039,
-      low: 0.00036,
-      close: 0.00037,
-    },
-    {
-      time: 1717218000 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.00041,
-      low: 0.00036,
-      close: 0.0004,
-    },
-    {
-      time: 1717221600 as UTCTimestamp,
-      open: 0.0004,
-      high: 0.00043,
-      low: 0.00039,
-      close: 0.00042,
-    },
-    {
-      time: 1717225200 as UTCTimestamp,
-      open: 0.00042,
-      high: 0.00043,
-      low: 0.0004,
-      close: 0.00041,
-    },
-  ],
-  '4h': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00032,
-      high: 0.00033,
-      low: 0.00031,
-      close: 0.00032,
-    },
-    {
-      time: 1717214400 as UTCTimestamp,
-      open: 0.00032,
-      high: 0.00035,
-      low: 0.00031,
-      close: 0.00034,
-    },
-    {
-      time: 1717228800 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00037,
-      low: 0.00033,
-      close: 0.00036,
-    },
-    {
-      time: 1717243200 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00039,
-      low: 0.00035,
-      close: 0.00038,
-    },
-    {
-      time: 1717257600 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00039,
-      low: 0.00036,
-      close: 0.00037,
-    },
-    {
-      time: 1717272000 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.00041,
-      low: 0.00036,
-      close: 0.0004,
-    },
-    {
-      time: 1717286400 as UTCTimestamp,
-      open: 0.0004,
-      high: 0.00042,
-      low: 0.00038,
-      close: 0.00041,
-    },
-    {
-      time: 1717300800 as UTCTimestamp,
-      open: 0.00041,
-      high: 0.00044,
-      low: 0.00039,
-      close: 0.00043,
-    },
-  ],
-  '1d': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00031,
-      high: 0.00032,
-      low: 0.0003,
-      close: 0.00031,
-    },
-    {
-      time: 1717286400 as UTCTimestamp,
-      open: 0.00031,
-      high: 0.00034,
-      low: 0.0003,
-      close: 0.00033,
-    },
-    {
-      time: 1717372800 as UTCTimestamp,
-      open: 0.00033,
-      high: 0.00036,
-      low: 0.00032,
-      close: 0.00035,
-    },
-    {
-      time: 1717459200 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00037,
-      low: 0.00034,
-      close: 0.00036,
-    },
-    {
-      time: 1717545600 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.00035,
-      low: 0.00033,
-      close: 0.00034,
-    },
-    {
-      time: 1717632000 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00038,
-      low: 0.00033,
-      close: 0.00037,
-    },
-    {
-      time: 1717718400 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.0004,
-      low: 0.00036,
-      close: 0.00039,
-    },
-    {
-      time: 1717804800 as UTCTimestamp,
-      open: 0.00039,
-      high: 0.00043,
-      low: 0.00038,
-      close: 0.00042,
-    },
-  ],
-  '1w': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00028,
-      high: 0.00029,
-      low: 0.00027,
-      close: 0.00028,
-    },
-    {
-      time: 1717804800 as UTCTimestamp,
-      open: 0.00028,
-      high: 0.00031,
-      low: 0.00027,
-      close: 0.0003,
-    },
-    {
-      time: 1718409600 as UTCTimestamp,
-      open: 0.0003,
-      high: 0.00034,
-      low: 0.00029,
-      close: 0.00033,
-    },
-    {
-      time: 1719014400 as UTCTimestamp,
-      open: 0.00033,
-      high: 0.00036,
-      low: 0.00032,
-      close: 0.00035,
-    },
-    {
-      time: 1719619200 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00036,
-      low: 0.00033,
-      close: 0.00034,
-    },
-    {
-      time: 1720224000 as UTCTimestamp,
-      open: 0.00034,
-      high: 0.00038,
-      low: 0.00033,
-      close: 0.00037,
-    },
-    {
-      time: 1720828800 as UTCTimestamp,
-      open: 0.00037,
-      high: 0.00039,
-      low: 0.00036,
-      close: 0.00038,
-    },
-    {
-      time: 1721433600 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00041,
-      low: 0.00037,
-      close: 0.0004,
-    },
-  ],
-  '1M': [
-    {
-      time: 1717200000 as UTCTimestamp,
-      open: 0.00025,
-      high: 0.00026,
-      low: 0.00024,
-      close: 0.00025,
-    },
-    {
-      time: 1719829743 as UTCTimestamp,
-      open: 0.00025,
-      high: 0.00029,
-      low: 0.00024,
-      close: 0.00028,
-    },
-    {
-      time: 1722459486 as UTCTimestamp,
-      open: 0.00028,
-      high: 0.00031,
-      low: 0.00027,
-      close: 0.0003,
-    },
-    {
-      time: 1725089229 as UTCTimestamp,
-      open: 0.0003,
-      high: 0.00034,
-      low: 0.00029,
-      close: 0.00033,
-    },
-    {
-      time: 1727718972 as UTCTimestamp,
-      open: 0.00033,
-      high: 0.00036,
-      low: 0.00032,
-      close: 0.00035,
-    },
-    {
-      time: 1730348715 as UTCTimestamp,
-      open: 0.00035,
-      high: 0.00039,
-      low: 0.00034,
-      close: 0.00038,
-    },
-    {
-      time: 1732978458 as UTCTimestamp,
-      open: 0.00038,
-      high: 0.00039,
-      low: 0.00035,
-      close: 0.00036,
-    },
-    {
-      time: 1735608201 as UTCTimestamp,
-      open: 0.00036,
-      high: 0.0004,
-      low: 0.00035,
-      close: 0.00039,
-    },
-  ],
+  '1m': generateSeries(timeframeConfigs['1m']),
+  '5m': generateSeries(timeframeConfigs['5m']),
+  '15m': generateSeries(timeframeConfigs['15m']),
+  '1h': generateSeries(timeframeConfigs['1h']),
+  '4h': generateSeries(timeframeConfigs['4h']),
+  '1d': generateSeries(timeframeConfigs['1d']),
+  '1w': generateSeries(timeframeConfigs['1w']),
+  '1M': generateSeries(timeframeConfigs['1M']),
 };

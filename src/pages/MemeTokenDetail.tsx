@@ -1,16 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Copy, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
-import {
-  CandlestickSeries,
-  ColorType,
-  CrosshairMode,
-  createChart,
-  type ISeriesApi,
-} from 'lightweight-charts';
 import { supabase } from '../lib/supabase';
 import { STATIC_SERIES, type TimeframeKey } from '../mock/candles';
-
-type ChartApi = ReturnType<typeof createChart>;
 
 interface MemeToken {
   id: string;
@@ -48,100 +39,68 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
   const [aiExpanded, setAiExpanded] = useState(false);
   const [timeframe, setTimeframe] = useState<TimeframeKey>('1d');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [isChartReady, setIsChartReady] = useState(false);
-  const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const chartApiRef = useRef<ChartApi | null>(null);
-  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
   const timeframes: TimeframeKey[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
+  const MAX_CANDLES = 100;
   // Add display constants for icon and symbol
   const DISPLAY_SYMBOL = 'PEPE';
   const DISPLAY_LOGO_URL = '/token_icons/21deed59dc9d05f4995f0ee947a9c753b14ca87f3950a4e3fe1ec1c09c8d462c.png';
 
-  useEffect(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
+  const getSeriesData = (key: TimeframeKey) => {
+    const series = STATIC_SERIES[key] ?? STATIC_SERIES['1d'];
+    return series.slice(-MAX_CANDLES);
+  };
 
-    setIsChartReady(false);
+  const chartSummary = useMemo(() => {
+    const data = getSeriesData(timeframe);
+    if (!data.length) {
+      return {
+        data,
+        linePoints: '',
+        areaPoints: '',
+        min: 0,
+        max: 0,
+        lastClose: 0,
+        hasData: false,
+      };
+    }
 
-    const chart = createChart(container, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#020617' },
-        textColor: '#94a3b8',
-        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-      },
-      rightPriceScale: {
-        borderColor: '#1e293b',
-        textColor: '#cbd5f5',
-        visible: true,
-      },
-      timeScale: {
-        borderColor: '#1e293b',
-        timeVisible: true,
-        secondsVisible: timeframe === '1m' || timeframe === '5m',
-      },
-      crosshair: {
-        horzLine: { color: '#475569', labelBackgroundColor: '#22c55e' },
-        vertLine: { color: '#475569', labelBackgroundColor: '#22c55e' },
-        mode: CrosshairMode.Normal,
-      },
-      grid: {
-        horzLines: { color: '#1e293b' },
-        vertLines: { color: '#1e293b' },
-      },
-    });
+    const highs = data.map((c) => c.high);
+    const lows = data.map((c) => c.low);
+    const min = Math.min(...lows);
+    const max = Math.max(...highs);
+    const range = max - min || Math.max(max * 0.01, 1e-6);
 
-    chartApiRef.current = chart;
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
-      borderVisible: false,
-    });
-    candleSeriesRef.current = series;
-
-    const data = STATIC_SERIES[timeframe] ?? [];
-    series.setData(data);
-    chart.timeScale().fitContent();
-    setIsChartReady(true);
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      entries.forEach((entry) => {
-        const { width, height } = entry.contentRect;
-        chart.applyOptions({ width, height });
-      });
-    });
-
-    resizeObserver.observe(container);
-    const { width, height } = container.getBoundingClientRect();
-    chart.applyOptions({ width, height });
-
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-      chartApiRef.current = null;
-      candleSeriesRef.current = null;
-      setIsChartReady(false);
+    const toPoint = (value: number, index: number) => {
+      const x =
+        data.length === 1 ? 0 : Number(((index / (data.length - 1)) * 100).toFixed(2));
+      const y = Number((100 - ((value - min) / range) * 100).toFixed(2));
+      return `${x},${y}`;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  useEffect(() => {
-    const series = candleSeriesRef.current;
-    const chart = chartApiRef.current;
-    if (!series || !chart) return;
+    const linePoints = data.map((candle, index) => toPoint(candle.close, index));
 
-    const data = STATIC_SERIES[timeframe] ?? STATIC_SERIES['1d'];
-    series.setData(data);
-    chart.applyOptions({
-      timeScale: {
-        secondsVisible: timeframe === '1m' || timeframe === '5m',
-      },
-    });
-    chart.timeScale().fitContent();
+    let areaPoints = '';
+    if (linePoints.length >= 2) {
+      areaPoints = `0,100 ${linePoints.join(' ')} 100,100`;
+    } else if (linePoints.length === 1) {
+      areaPoints = `0,100 ${linePoints[0]} 100,100`;
+    }
+
+    const lastClose = data[data.length - 1]?.close ?? 0;
+
+    return {
+      data,
+      linePoints: linePoints.join(' '),
+      areaPoints,
+      min,
+      max,
+      lastClose,
+      hasData: true,
+    };
   }, [timeframe]);
+
+  const gradientId = useMemo(() => `chartGradient-${timeframe}`, [timeframe]);
 
   useEffect(() => {
     fetchTokenData();
@@ -282,14 +241,48 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
                 ))}
               </div>
               <div className="h-[400px] relative rounded-lg overflow-hidden bg-slate-950/40">
-                <div
-                  ref={chartContainerRef}
-                  className="absolute inset-0 w-full h-full"
-                />
-                {!isChartReady && (
+                {chartSummary.hasData ? (
+                  <>
+                    <svg
+                      viewBox="0 0 100 100"
+                      preserveAspectRatio="none"
+                      className="absolute inset-0 w-full h-full"
+                    >
+                      <defs>
+                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#22c55e" stopOpacity="0.35" />
+                          <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {chartSummary.areaPoints && (
+                        <polygon
+                          points={chartSummary.areaPoints}
+                          fill={`url(#${gradientId})`}
+                          stroke="none"
+                        />
+                      )}
+                      {chartSummary.linePoints && (
+                        <polyline
+                          points={chartSummary.linePoints}
+                          fill="none"
+                          stroke="#22c55e"
+                          strokeWidth={1.5}
+                        />
+                      )}
+                    </svg>
+                    <div className="absolute top-4 left-4 text-xs text-slate-400 space-y-1">
+                      <div>High: <span className="text-emerald-300">${chartSummary.max.toFixed(6)}</span></div>
+                      <div>Low: <span className="text-rose-300">${chartSummary.min.toFixed(6)}</span></div>
+                    </div>
+                    <div className="absolute top-4 right-4 text-right text-xs text-slate-400">
+                      <div className="text-2xl font-semibold text-white">${chartSummary.lastClose.toFixed(6)}</div>
+                      <div>Last Price</div>
+                    </div>
+                  </>
+                ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2">
                     <TrendingUp size={36} className="opacity-20" />
-                    <span className="text-sm">Loading chart...</span>
+                    <span className="text-sm">No chart data available.</span>
                   </div>
                 )}
               </div>
