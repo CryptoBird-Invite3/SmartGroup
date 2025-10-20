@@ -9,7 +9,7 @@ const projectId = import.meta.env.VITE_WC_PROJECT_ID as string | undefined;
 
 export const wagmiConfig = projectId
   ? getDefaultConfig({
-      appName: 'MemeHub',
+      appName: 'CryptoBird',
       projectId,
       chains: [base],
       ssr: false,

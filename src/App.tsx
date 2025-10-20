@@ -112,7 +112,7 @@ export default function App() {
         {currentPage === 'home' && (
           <div className="max-w-7xl mx-auto px-6 py-6">
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-center text-white">
-              <h1 className="text-3xl font-bold mb-4">SmartGroup Demo</h1>
+              <h1 className="text-3xl font-bold mb-4">CryptoBird Demo</h1>
               <p className="text-slate-300">Use the top navigation to explore pages.</p>
             </div>
           </div>
