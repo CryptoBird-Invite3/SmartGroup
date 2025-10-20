@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BarChart3, TrendingUp, Users, Home } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trophy, Coins, Megaphone, UserCog } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import CommunityLeaderboard from './pages/CommunityLeaderboard';
 import MemeTokenDetail from './pages/MemeTokenDetail';
@@ -8,8 +8,45 @@ import GroupOwnerDashboard from './pages/GroupOwnerDashboard';
 
 type Page = 'home' | 'leaderboard' | 'token' | 'campaign' | 'dashboard';
 
+const pageToPath = (p: Page) => {
+  switch (p) {
+    case 'leaderboard': return '/leaderboard';
+    case 'token': return '/token';
+    case 'campaign': return '/campaign';
+    case 'dashboard': return '/dashboard';
+    case 'home':
+    default: return '/';
+  }
+};
+
+const pathToPage = (pathname: string): Page => {
+  switch (pathname) {
+    case '/leaderboard': return 'leaderboard';
+    case '/token': return 'token';
+    case '/campaign': return 'campaign';
+    case '/dashboard': return 'dashboard';
+    case '/':
+    default: return 'home';
+  }
+};
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
+
+  const navigateTo = (p: Page) => {
+    setCurrentPage(p);
+    const path = pageToPath(p);
+    window.history.pushState({ page: p }, '', path);
+  };
+
+  useEffect(() => {
+    // 初始加载根据路径设置页面
+    setCurrentPage(pathToPage(window.location.pathname));
+    // 监听浏览器前进/后退
+    const onPopState = () => setCurrentPage(pathToPage(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -17,55 +54,57 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-lg flex items-center justify-center">
-                  <TrendingUp size={20} className="text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">MemeHub</span>
-              </div>
+              <button
+                onClick={() => navigateTo('home')}
+                className="flex items-center gap-2 focus:outline-none hover:opacity-90 transition-opacity cursor-pointer"
+                aria-label="Go Home"
+              >
+                <img src="/logo/Logo.png" alt="CryptoBird logo" className="w-8 h-8 rounded-lg" />
+                <span className="text-xl font-bold text-white">CryptoBird</span>
+              </button>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setCurrentPage('leaderboard')}
+                  onClick={() => navigateTo('leaderboard')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     currentPage === 'leaderboard'
                       ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <BarChart3 size={18} />
+                  <Trophy size={18} />
                   Leaderboard
                 </button>
                 <button
-                  onClick={() => setCurrentPage('token')}
+                  onClick={() => navigateTo('token')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     currentPage === 'token'
                       ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <TrendingUp size={18} />
+                  <Coins size={18} />
                   Token Detail
                 </button>
                 <button
-                  onClick={() => setCurrentPage('campaign')}
+                  onClick={() => navigateTo('campaign')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     currentPage === 'campaign'
                       ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <Home size={18} />
+                  <Megaphone size={18} />
                   Campaign
                 </button>
                 <button
-                  onClick={() => setCurrentPage('dashboard')}
+                  onClick={() => navigateTo('dashboard')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     currentPage === 'dashboard'
                       ? 'bg-slate-800 text-white'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <Users size={18} />
+                  <UserCog size={18} />
                   Group Owner
                 </button>
               </div>
@@ -77,9 +116,9 @@ export default function App() {
 
       <main>
         {currentPage === 'leaderboard' && <CommunityLeaderboard />}
-        {currentPage === 'token' && <MemeTokenDetail goCampaign={() => setCurrentPage('campaign')} />}
-        {currentPage === 'campaign' && <CampaignDetail onTradeNow={() => setCurrentPage('token')} />}
-        {currentPage === 'dashboard' && <GroupOwnerDashboard goCampaign={() => setCurrentPage('campaign')} />}
+        {currentPage === 'token' && <MemeTokenDetail goCampaign={() => navigateTo('campaign')} />}
+        {currentPage === 'campaign' && <CampaignDetail onTradeNow={() => navigateTo('token')} />}
+        {currentPage === 'dashboard' && <GroupOwnerDashboard goCampaign={() => navigateTo('campaign')} />}
         {currentPage === 'home' && (
           <div className="max-w-7xl mx-auto px-6 py-6">
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-center text-white">
