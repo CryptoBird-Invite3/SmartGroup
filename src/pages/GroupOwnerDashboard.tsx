@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Users, Award, ChevronDown } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
 interface Campaign {
@@ -18,7 +17,9 @@ interface Campaign {
 
 export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () => void }) {
   const [activeTab, setActiveTab] = useState<'commission' | 'campaigns' | 'bot'>('campaigns');
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
   const [selectedCommunity] = useState('币圈猎狗群'); // 移除未使用的setter
   const [isWalletBound, setIsWalletBound] = useState(false);
   const [liveCampaigns, setLiveCampaigns] = useState<Campaign[]>([]);
@@ -96,7 +97,13 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
   };
 
   const handleTelegramLogin = () => {
-    setIsAuthenticated(true);
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    setTimeout(() => {
+      setIsAuthenticated(true);
+      setIsLoggingIn(false);
+      setUserName('@shao rockey');
+    }, 3000);
   };
 
   const handleBindWallet = () => {
@@ -114,17 +121,31 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
           <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Users size={32} className="text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3">Welcome</h1>
-          <p className="text-slate-400 mb-8">Please log in with your Telegram account to access and manage your community dashboard.</p>
+          <h1 className="text-3xl font-bold text-white mb-3">登录到群主控制台</h1>
+          <p className="text-slate-400 mb-8">请使用 Telegram 登录以访问和管理你的社区数据。</p>
           <button
             onClick={handleTelegramLogin}
-            className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-3"
+            disabled={isLoggingIn}
+            className="w-full py-4 bg-blue-500 hover:bg-blue-600 disabled:hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-3"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.717-1.048 4.49-1.48 5.954-.184.621-.543.829-.891.85-.756.069-1.33-.5-2.063-.981-1.146-.754-1.793-1.222-2.905-1.957-1.286-.85-.453-1.318.28-2.081.192-.2 3.527-3.234 3.593-3.51.008-.034.016-.162-.061-.23-.077-.067-.19-.044-.272-.026-.116.026-1.968 1.25-5.554 3.67-.526.361-1.003.537-1.43.528-.471-.01-1.377-.266-2.051-.485-.825-.269-1.481-.411-1.424-.866.03-.237.354-.479.974-.726 3.818-1.664 6.364-2.764 7.636-3.302 3.638-1.516 4.395-1.78 4.891-1.788.108-.002.35.025.507.152.133.108.17.253.187.355.018.102.04.335.022.517z"/>
-            </svg>
-            Login with Telegram
+            {isLoggingIn ? (
+              <>
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                正在登录，请在手机端确认…
+              </>
+            ) : (
+              <>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.717-1.048 4.49-1.48 5.954-.184.621-.543.829-.891.85-.756.069-1.33-.5-2.063-.981-1.146-.754-1.793-1.222-2.905-1.957-1.286-.85-.453-1.318.28-2.081.192-.2 3.527-3.234 3.593-3.51.008-.034.016-.162-.061-.23-.077-.067-.19-.044-.272-.026-.116.026-1.968 1.25-5.554 3.67-.526.361-1.003.537-1.43.528-.471-.01-1.377-.266-2.051-.485-.825-.269-1.481-.411-1.424-.866.03-.237.354-.479.974-.726 3.818-1.664 6.364-2.764 7.636-3.302 3.638-1.516 4.395-1.78 4.891-1.788.108-.002.35.025.507.152.133.108.17.253.187.355.018.102.04.335.022.517z"/>
+                </svg>
+                使用 Telegram 登录
+              </>
+            )}
           </button>
+          <p className="text-slate-400 mt-4">{isLoggingIn ? '正在等待 Telegram 确认（约3秒）…' : '点击上方按钮开始登录'}</p>
         </div>
       </div>
     );
@@ -183,7 +204,7 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                   alt="User"
                   className="w-10 h-10 rounded-full"
                 />
-                <span className="text-white font-medium">@cryptoking</span>
+                <span className="text-white font-medium">{userName ?? '@shao rockey'}</span>
                 {isWalletBound ? (
                   <span className="text-slate-400 text-sm">0x1234...5678</span>
                 ) : (
@@ -286,7 +307,7 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                   alt="User"
                   className="w-10 h-10 rounded-full"
                 />
-                <span className="text-white font-medium">@cryptoking</span>
+                <span className="text-white font-medium">{userName ?? '@shao rockey'}</span>
                 {isWalletBound ? (
                   <span className="text-slate-400 text-sm">0x1234...5678</span>
                 ) : (
