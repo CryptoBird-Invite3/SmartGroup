@@ -1,6 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TrendingUp, DollarSign, Users, Award, ChevronDown } from 'lucide-react';
+// 移除未使用的 supabase 导入
+// import { supabase } from '../lib/supabase';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
+import { useAccount, useSignTypedData } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { base } from 'wagmi/chains';
+import { CORE_VAULT_ADDRESS, CORE_VAULT_NAME } from '../lib/coreVault';
 
 interface Campaign {
   id: string;
@@ -28,6 +34,26 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
   const [showWithdrawHistory, setShowWithdrawHistory] = useState(false);
   const [, setIsBotAdded] = useState(false); // 只保留setter用于handleBotAdded函数
   const [trendData, setTrendData] = useState<{ day: string; commission: number; signals: number }[]>([]);
+  // 新增：可提现余额（USD）、输入金额、错误与签名状态
+  const [availableRewardsUSD, setAvailableRewardsUSD] = useState<number>(1864.5);
+  const [availableCommissionUSD, setAvailableCommissionUSD] = useState<number>(1864.5);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [isSigning, setIsSigning] = useState(false);
+  const [withdrawSource, setWithdrawSource] = useState<'commission' | 'rewards' | null>(null);
+  const [withdrawHistory, setWithdrawHistory] = useState<{ time: string; amountUsd: number; address: string; source: 'commission' | 'rewards' }[]>([]);
+  // 插入 wagmi/RainbowKit hooks：用于检查连接状态和打开连接流程
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { signTypedDataAsync } = useSignTypedData();
+  // 初始化会话内的历史记录示例（刷新后不会持久化）
+  useEffect(() => {
+    setWithdrawHistory([
+      { time: '2023-10-26 15:30', amountUsd: 500, address: '0x1234...abcd', source: 'commission' },
+      { time: '2023-10-20 10:15', amountUsd: 350, address: '0x1234...abcd', source: 'commission' },
+    ]);
+  }, []);
+
   const LEFT_DOMAIN: [number, number] = [10, 100];
   const RIGHT_DOMAIN: [number, number] = [1, 100];
   const LEFT_MID = (LEFT_DOMAIN[0] + LEFT_DOMAIN[1]) / 2;
@@ -47,6 +73,13 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
     'f850788494ba8ad70982fec3c55d0b1f.webp',
   ] as const;
   const getIcon = (i: number) => `/token_icons/${TOKEN_ICONS[i % TOKEN_ICONS.length]}`;
+
+  const shorten = (val?: string | null, front = 6, back = 4) => {
+    if (!val) return '-';
+    const s = String(val);
+    if (s.length <= front + back + 3) return s;
+    return `${s.slice(0, front)}...${s.slice(-back)}`;
+  };
 
   useEffect(() => {
     fetchCampaigns();
@@ -148,69 +181,232 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
     );
   }
 
-  // AI Chat Tab: lazy-load SDK script and init widget
+  // AI Chat Tab: Embedded full-screen chat interface
   function AIChatTab() {
+    const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string; timestamp: Date}>>([]);
+    const [inputValue, setInputValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
     useEffect(() => {
-      let isMounted = true;
-      const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = (e) => reject(e);
-        document.body.appendChild(s);
-      });
-      const initWidget = () => {
+      scrollToBottom();
+    }, [messages]);
+
+    useEffect(() => {
+      // Load chat history from localStorage
+      const savedMessages = localStorage.getItem('ai-chat-history');
+      if (savedMessages) {
         try {
-          const w: any = window as any;
-          const WidgetCtor = w.AIChatWidget || w.ChatSnailWidget || w.ChatSnailSDK;
-          if (!WidgetCtor) {
-            console.error('AI Chat SDK 未找到构造函数');
-            return;
-          }
-          const widget = new WidgetCtor({
-            theme: 'dark',
-            language: 'zh',
-            position: 'bottom-right',
-            title: 'AI Chat',
-            subtitle: '群助手 / 智能问答',
-            welcomeMessage: '你好！我是群助手，有什么可以帮你？',
-            primaryColor: '#A472DA',
-          });
-          widget.init?.();
-          console.log('AI Chat SDK 初始化成功');
+          const parsed = JSON.parse(savedMessages);
+          setMessages(parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          })));
         } catch (e) {
-          console.error('AI Chat SDK 初始化失败:', e);
+          console.error('Failed to load chat history:', e);
         }
-      };
-      (async () => {
-        try {
-          console.log('尝试加载 chat-snail-sdk');
-          await loadScript('https://unpkg.com/chat-snail-sdk@latest/dist/widget.min.js');
-          if (!isMounted) return;
-          initWidget();
-        } catch (e1) {
-          console.warn('chat-snail-sdk 加载失败，尝试备用 SDK', e1);
-          try {
-            console.log('尝试加载 ai-chat-widget-sdk');
-            await loadScript('https://unpkg.com/ai-chat-widget-sdk@latest/dist/widget.min.js');
-            if (!isMounted) return;
-            initWidget();
-          } catch (e2) {
-            console.error('备用 SDK 加载失败：', e2);
-          }
-        }
-      })();
-      return () => { isMounted = false; };
+      }
     }, []);
 
+    useEffect(() => {
+      // Save chat history to localStorage
+      if (messages.length > 0) {
+        localStorage.setItem('ai-chat-history', JSON.stringify(messages));
+      }
+    }, [messages]);
+
+    const sendMessage = async () => {
+      if (!inputValue.trim() || isLoading) return;
+
+      const userMessage = {
+        id: Date.now().toString(),
+        type: 'user' as const,
+        content: inputValue.trim(),
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+      setIsLoading(true);
+
+      try {
+        // Call Dify API
+        const response = await fetch(`${import.meta.env.VITE_DIFY_BASE_URL}/v1/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_DIFY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: {},
+            query: userMessage.content,
+            response_mode: 'blocking',
+            user: import.meta.env.VITE_DIFY_USER || 'default-user',
+            conversation_id: localStorage.getItem('dify-conversation-id') || undefined
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Save conversation ID for context
+        if (data.conversation_id) {
+          localStorage.setItem('dify-conversation-id', data.conversation_id);
+        }
+
+        const botMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot' as const,
+          content: data.answer || '抱歉，我现在无法回答。',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        const errorMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot' as const,
+          content: '抱歉，发送消息失败。请检查网络连接或稍后再试。',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+
+    const clearHistory = () => {
+      if (confirm('确定要清除所有对话历史吗？')) {
+        setMessages([]);
+        localStorage.removeItem('ai-chat-history');
+        localStorage.removeItem('dify-conversation-id');
+      }
+    };
+
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-white">
-          <h2 className="text-2xl font-bold mb-2">AI Chat</h2>
-          <p className="text-slate-300 mb-4">已集成聊天 SDK。点击右下角悬浮按钮打开对话。</p>
-          <div className="text-sm text-slate-400">
-            如未看到悬浮按钮，请检查控制台日志或网络拦截，并确保允许从 unpkg CDN 加载脚本。
+      <div className="h-[calc(100vh-12rem)] flex flex-col bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-xl">🤖</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">AI 群助手</h2>
+              <p className="text-xs text-slate-400">智能问答 · 随时为您服务</p>
+            </div>
+          </div>
+          <button
+            onClick={clearHistory}
+            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+          >
+            清除历史
+          </button>
+        </div>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">💬</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">开始对话</h3>
+                <p className="text-slate-400 text-sm">
+                  你好！我是 AI 群助手，有什么可以帮你？
+                </p>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`flex gap-3 max-w-[80%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    msg.type === 'user' ? 'bg-emerald-500/20' : 'bg-slate-700'
+                  }`}>
+                    <span className="text-sm">{msg.type === 'user' ? '👤' : '🤖'}</span>
+                  </div>
+                  <div>
+                    <div className={`rounded-2xl px-4 py-3 ${
+                      msg.type === 'user'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-800 text-slate-100'
+                    }`}>
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 px-2">
+                      {msg.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex gap-3 max-w-[80%]">
+                <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">🤖</span>
+                </div>
+                <div className="bg-slate-800 rounded-2xl px-4 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="px-6 py-4 border-t border-slate-800">
+          <div className="flex gap-2">
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
+              className="flex-1 bg-slate-800 text-white rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              rows={1}
+              style={{ minHeight: '44px', maxHeight: '120px' }}
+              disabled={isLoading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!inputValue.trim() || isLoading}
+              className="px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+            >
+              {isLoading ? (
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+              ) : (
+                <span>发送</span>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -293,10 +489,17 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                   <h3 className="text-slate-400 text-sm font-medium">Unclaimed Commission (USD)</h3>
                   <DollarSign className="text-emerald-400" size={24} />
                 </div>
-                <div className="text-3xl font-bold text-white mb-4">$1,864.50</div>
+                <div className="text-3xl font-bold text-white mb-4">${availableCommissionUSD.toLocaleString()}</div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowWithdrawModal(true)}
+                    onClick={() => {
+                      if (isConnected) {
+                        setWithdrawSource('commission');
+                        setShowWithdrawModal(true);
+                      } else {
+                        openConnectModal?.();
+                      }
+                    }}
                     className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     Withdraw
@@ -388,10 +591,17 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                 <h3 className="text-slate-400 text-sm font-medium">Unclaimed Rewards (USD)</h3>
                 <Award className="text-purple-400" size={24} />
               </div>
-              <div className="text-3xl font-bold text-white mb-4">$1,864.50</div>
+              <div className="text-3xl font-bold text-white mb-4">${availableRewardsUSD.toLocaleString()}</div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setShowWithdrawModal(true)}
+                  onClick={() => {
+                    if (isConnected) {
+                      setWithdrawSource('rewards');
+                      setShowWithdrawModal(true);
+                    } else {
+                      openConnectModal?.();
+                    }
+                  }}
                   className="py-2 px-6 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   Withdraw
@@ -535,6 +745,8 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
             </div>
           </div>
         )}
+
+        {activeTab === 'chat' && <AIChatTab />}
       </div>
 
       {showWithdrawModal && (
@@ -544,27 +756,134 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-sm text-slate-400 mb-2 block">Available Amount</label>
-                <div className="text-3xl font-bold text-white">$1,864.50</div>
+                <div className="text-3xl font-bold text-white">${(withdrawSource === 'rewards' ? availableRewardsUSD : availableCommissionUSD).toLocaleString()}</div>
               </div>
               <div>
                 <label className="text-sm text-slate-400 mb-2 block">Withdrawal Address</label>
                 <div className="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white font-mono">
-                  0x1234...5678
+                  {shorten(address ?? 'No wallet connected')}
                 </div>
               </div>
+              <div>
+                <label className="text-sm text-slate-400 mb-2 block">Withdraw Amount (USD)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                  placeholder="例如：100.00"
+                />
+              </div>
+              {(() => {
+                const amt = parseFloat(withdrawAmount || '0');
+                const fee = +(amt * 0.003).toFixed(2);
+                const net = +(amt - fee).toFixed(2);
+                return (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="text-slate-400">Payer</div>
+                    <div className="text-white font-mono text-right">{shorten(address ?? '-')}</div>
+                    <div className="text-slate-400">Receiver</div>
+                    <div className="text-white font-mono text-right">{shorten(CORE_VAULT_ADDRESS)}</div>
+                    <div className="text-slate-400">Amount (USD)</div>
+                    <div className="text-white text-right">${isNaN(amt) ? '0.00' : amt.toFixed(2)}</div>
+                    <div className="text-slate-400">Fee (USD)</div>
+                    <div className="text-white text-right">${isNaN(fee) ? '0.00' : fee.toFixed(2)}</div>
+                    <div className="text-slate-400">Net (USD)</div>
+                    <div className="text-white text-right">${isNaN(net) ? '0.00' : net.toFixed(2)}</div>
+                  </div>
+                );
+              })()}
+              {withdrawError && (
+                <div className="text-red-400 text-sm">{withdrawError}</div>
+              )}
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowWithdrawModal(false)}
+                onClick={() => {
+                  setShowWithdrawModal(false);
+                  setWithdrawAmount('');
+                  setWithdrawError(null);
+                }}
                 className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={() => setShowWithdrawModal(false)}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                onClick={async () => {
+                  setWithdrawError(null);
+                  if (!isConnected) {
+                    openConnectModal?.();
+                    return;
+                  }
+                  const amt = parseFloat(withdrawAmount || '0');
+                  if (!Number.isFinite(amt) || amt <= 0) {
+                    setWithdrawError('请输入有效的提现金额');
+                    return;
+                  }
+                  const availableUSD = withdrawSource === 'rewards' ? availableRewardsUSD : availableCommissionUSD;
+                  if (amt > availableUSD) {
+                    setWithdrawError('提现金额不能超过可用余额');
+                    return;
+                  }
+                  setIsSigning(true);
+                  try {
+                    const fee = +(amt * 0.003).toFixed(2);
+                    const net = +(amt - fee).toFixed(2);
+                    const amountCents = BigInt(Math.round(amt * 100));
+                    const feeCents = BigInt(Math.round(fee * 100));
+                    const netCents = BigInt(Math.round(net * 100));
+                    const nonce = BigInt(Date.now());
+                    await signTypedDataAsync({
+                      domain: {
+                        name: CORE_VAULT_NAME,
+                        version: '1',
+                        chainId: base.id,
+                        verifyingContract: CORE_VAULT_ADDRESS,
+                      },
+                      types: {
+                        Withdraw: [
+                          { name: 'payer', type: 'address' },
+                          { name: 'receiver', type: 'address' },
+                          { name: 'amountCents', type: 'uint256' },
+                          { name: 'feeCents', type: 'uint256' },
+                          { name: 'netCents', type: 'uint256' },
+                          { name: 'nonce', type: 'uint256' },
+                        ],
+                      },
+                      primaryType: 'Withdraw',
+                      message: {
+                        payer: address!,
+                        receiver: CORE_VAULT_ADDRESS,
+                        amountCents,
+                        feeCents,
+                        netCents,
+                        nonce,
+                      },
+                    });
+                    // 模拟交易成功：扣减余额并关闭弹窗 + 记录历史
+                    if (withdrawSource === 'rewards') {
+                      setAvailableRewardsUSD((prev) => +(prev - amt).toFixed(2));
+                    } else if (withdrawSource === 'commission') {
+                      setAvailableCommissionUSD((prev) => +(prev - amt).toFixed(2));
+                    }
+                    setWithdrawHistory((prev) => [
+                      { time: new Date().toLocaleString(), amountUsd: amt, address: address!, source: withdrawSource ?? 'rewards' },
+                      ...prev,
+                    ]);
+                    setShowWithdrawModal(false);
+                    setWithdrawAmount('');
+                  } catch {
+                    setWithdrawError('签名已取消或发生错误');
+                  } finally {
+                    setIsSigning(false);
+                  }
+                }}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                disabled={isSigning}
               >
-                Confirm Withdraw
+                {isSigning ? 'Signing…' : 'Sign & Withdraw'}
               </button>
             </div>
           </div>
@@ -581,16 +900,17 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
                 <span className="text-right">Amount</span>
                 <span className="text-right">Address</span>
               </div>
-              <div className="grid grid-cols-3 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
-                <span className="text-sm text-slate-300">2023-10-26 15:30</span>
-                <span className="text-sm text-slate-300 text-right">- $500.00</span>
-                <span className="text-sm text-slate-400 text-right font-mono">0x1234...abcd</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
-                <span className="text-sm text-slate-300">2023-10-20 10:15</span>
-                <span className="text-sm text-slate-300 text-right">- $350.00</span>
-                <span className="text-sm text-slate-400 text-right font-mono">0x1234...abcd</span>
-              </div>
+              {withdrawHistory.length > 0 ? (
+                withdrawHistory.map((h, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
+                    <span className="text-sm text-slate-300">{h.time}</span>
+                    <span className="text-sm text-slate-300 text-right">- ${h.amountUsd.toFixed(2)}</span>
+                    <span className="text-sm text-slate-400 text-right font-mono">{shorten(h.address)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-400 text-sm px-4 py-3">No history yet</div>
+              )}
             </div>
             <button
               onClick={() => setShowWithdrawHistory(false)}
