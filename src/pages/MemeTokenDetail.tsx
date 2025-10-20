@@ -215,11 +215,11 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
                 <div className="p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <img
-                      src="https://api.dicebear.com/7.x/avataaars/svg?seed=crypto1"
-                      alt="Community"
+                      src="/group_icons/2025-10-19 16.33.25.jpg"
+                      alt="Group Avatar"
                       className="w-10 h-10 rounded-lg"
                     />
-                    <span className="font-medium text-white">币圈猎狗群</span>
+                    <span className="font-medium text-white">0xSun_VIP群</span>
                   </div>
                   <div className="space-y-2">
                     <div className="grid grid-cols-6 gap-4 px-4 py-2 text-xs font-semibold text-slate-400 border-b border-slate-800">
@@ -234,19 +234,19 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
                       <span className="text-sm text-slate-300">10:24:15</span>
                       <span className="text-sm">
                         <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-medium">
-                          Leader Buy
+                          Leader Call
                         </span>
                       </span>
                       <div className="flex items-center gap-2">
                         <img
-                          src="https://api.dicebear.com/7.x/avataaars/svg?seed=leader1"
+                          src="/group_icons/ej9BX01I_400x400.png"
                           alt="Leader"
-                          className="w-6 h-6 rounded-full"
+                          className="w-6 h-6 rounded-full object-cover"
                         />
-                        <span className="text-sm text-slate-300">@cryptoking</span>
+                        <span className="text-sm text-slate-300">@0xSun</span>
                       </div>
                       <span className="text-sm text-slate-300 text-right">$0.000356</span>
-                      <span className="text-sm text-slate-300 text-right">5 ETH</span>
+                      <span className="text-sm text-slate-300 text-right">-</span>
                       <span></span>
                     </div>
                     <div className="grid grid-cols-6 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
@@ -262,6 +262,36 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
                       </div>
                       <span className="text-sm text-slate-300 text-right">$0.000358</span>
                       <span className="text-sm text-slate-300 text-right">0.5 ETH</span>
+                      <span></span>
+                    </div>
+                    <div className="grid grid-cols-6 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
+                      <span className="text-sm text-slate-400">+3m</span>
+                      <span className="text-sm">
+                        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+                          Follow
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-teal-500" />
+                        <span className="text-sm text-slate-400 font-mono">0x5e6f...7a8b</span>
+                      </div>
+                      <span className="text-sm text-slate-300 text-right">$0.000360</span>
+                      <span className="text-sm text-slate-300 text-right">0.2 ETH</span>
+                      <span></span>
+                    </div>
+                    <div className="grid grid-cols-6 gap-4 px-4 py-3 rounded-lg hover:bg-slate-800/30">
+                      <span className="text-sm text-slate-400">+5m</span>
+                      <span className="text-sm">
+                        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
+                          Follow
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-500 to-yellow-500" />
+                        <span className="text-sm text-slate-400 font-mono">0xb1c2...d3e4</span>
+                      </div>
+                      <span className="text-sm text-slate-300 text-right">$0.000355</span>
+                      <span className="text-sm text-slate-300 text-right">1 ETH</span>
                       <span></span>
                     </div>
                   </div>

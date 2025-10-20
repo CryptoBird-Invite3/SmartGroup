@@ -16,7 +16,7 @@ interface Campaign {
 }
 
 export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () => void }) {
-  const [activeTab, setActiveTab] = useState<'commission' | 'campaigns' | 'bot'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'commission' | 'campaigns' | 'bot' | 'chat'>('campaigns');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -148,6 +148,75 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
     );
   }
 
+  // AI Chat Tab: lazy-load SDK script and init widget
+  function AIChatTab() {
+    useEffect(() => {
+      let isMounted = true;
+      const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = (e) => reject(e);
+        document.body.appendChild(s);
+      });
+      const initWidget = () => {
+        try {
+          const w: any = window as any;
+          const WidgetCtor = w.AIChatWidget || w.ChatSnailWidget || w.ChatSnailSDK;
+          if (!WidgetCtor) {
+            console.error('AI Chat SDK 未找到构造函数');
+            return;
+          }
+          const widget = new WidgetCtor({
+            theme: 'dark',
+            language: 'zh',
+            position: 'bottom-right',
+            title: 'AI Chat',
+            subtitle: '群助手 / 智能问答',
+            welcomeMessage: '你好！我是群助手，有什么可以帮你？',
+            primaryColor: '#A472DA',
+          });
+          widget.init?.();
+          console.log('AI Chat SDK 初始化成功');
+        } catch (e) {
+          console.error('AI Chat SDK 初始化失败:', e);
+        }
+      };
+      (async () => {
+        try {
+          console.log('尝试加载 chat-snail-sdk');
+          await loadScript('https://unpkg.com/chat-snail-sdk@latest/dist/widget.min.js');
+          if (!isMounted) return;
+          initWidget();
+        } catch (e1) {
+          console.warn('chat-snail-sdk 加载失败，尝试备用 SDK', e1);
+          try {
+            console.log('尝试加载 ai-chat-widget-sdk');
+            await loadScript('https://unpkg.com/ai-chat-widget-sdk@latest/dist/widget.min.js');
+            if (!isMounted) return;
+            initWidget();
+          } catch (e2) {
+            console.error('备用 SDK 加载失败：', e2);
+          }
+        }
+      })();
+      return () => { isMounted = false; };
+    }, []);
+
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-white">
+          <h2 className="text-2xl font-bold mb-2">AI Chat</h2>
+          <p className="text-slate-300 mb-4">已集成聊天 SDK。点击右下角悬浮按钮打开对话。</p>
+          <div className="text-sm text-slate-400">
+            如未看到悬浮按钮，请检查控制台日志或网络拦截，并确保允许从 unpkg CDN 加载脚本。
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -182,6 +251,16 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
               }`}
             >
               Add Bot Guide
+            </button>
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex-1 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'chat'
+                  ? 'text-white border-b-2 border-emerald-500'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              AI Chat
             </button>
           </div>
         </div>

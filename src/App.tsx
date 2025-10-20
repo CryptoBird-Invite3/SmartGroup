@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trophy, Coins, Megaphone, UserCog } from 'lucide-react';
+import { Trophy, Coins, UserCog } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import CommunityLeaderboard from './pages/CommunityLeaderboard';
 import MemeTokenDetail from './pages/MemeTokenDetail';
@@ -85,17 +85,7 @@ export default function App() {
                   <Coins size={18} />
                   Token Detail
                 </button>
-                <button
-                  onClick={() => navigateTo('campaign')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    currentPage === 'campaign'
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Megaphone size={18} />
-                  Campaign
-                </button>
+                {/* 移除 Campaign 入口按钮 */}
                 <button
                   onClick={() => navigateTo('dashboard')}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
@@ -105,7 +95,7 @@ export default function App() {
                   }`}
                 >
                   <UserCog size={18} />
-                  Group Owner
+                  Group Leader
                 </button>
               </div>
             </div>
