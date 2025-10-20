@@ -174,7 +174,7 @@ export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => voi
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="max-w-[1800px] mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6">
