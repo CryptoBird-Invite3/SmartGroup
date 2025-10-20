@@ -317,7 +317,7 @@ export default function CampaignDetail({ onTradeNow }: { onTradeNow?: () => void
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6">
               <div className="flex items-center gap-4 mb-4">
                 <img
-                  src="https://api.dicebear.com/7.x/identicon/svg?seed=pepe"
+                  src="/token_icons/21deed59dc9d05f4995f0ee947a9c753b14ca87f3950a4e3fe1ec1c09c8d462c.png"
                   alt="PEPE"
                   className="w-16 h-16 rounded-xl"
                 />

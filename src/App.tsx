@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { BarChart3, TrendingUp, Users, Home } from 'lucide-react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import CommunityLeaderboard from './pages/CommunityLeaderboard';
 import MemeTokenDetail from './pages/MemeTokenDetail';
-import GroupOwnerDashboard from './pages/GroupOwnerDashboard';
 import CampaignDetail from './pages/CampaignDetail';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import GroupOwnerDashboard from './pages/GroupOwnerDashboard';
 
 type Page = 'home' | 'leaderboard' | 'token' | 'campaign' | 'dashboard';
 
-function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('leaderboard');
+export default function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('home');
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -23,7 +23,6 @@ function App() {
                 </div>
                 <span className="text-xl font-bold text-white">MemeHub</span>
               </div>
-
               <div className="flex gap-1">
                 <button
                   onClick={() => setCurrentPage('leaderboard')}
@@ -71,8 +70,6 @@ function App() {
                 </button>
               </div>
             </div>
-
-            {/* Replace plain button with RainbowKit ConnectButton */}
             <ConnectButton />
           </div>
         </div>
@@ -80,12 +77,18 @@ function App() {
 
       <main>
         {currentPage === 'leaderboard' && <CommunityLeaderboard />}
-        {currentPage === 'token' && <MemeTokenDetail />}
+        {currentPage === 'token' && <MemeTokenDetail goCampaign={() => setCurrentPage('campaign')} />}
         {currentPage === 'campaign' && <CampaignDetail onTradeNow={() => setCurrentPage('token')} />}
-        {currentPage === 'dashboard' && <GroupOwnerDashboard />}
+        {currentPage === 'dashboard' && <GroupOwnerDashboard goCampaign={() => setCurrentPage('campaign')} />}
+        {currentPage === 'home' && (
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-center text-white">
+              <h1 className="text-3xl font-bold mb-4">SmartGroup Demo</h1>
+              <p className="text-slate-300">Use the top navigation to explore pages.</p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
 }
-
-export default App;

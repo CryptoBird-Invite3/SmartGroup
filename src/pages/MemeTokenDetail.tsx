@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, TrendingUp, Wallet } from 'lucide-react';
+import { Copy, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface MemeToken {
@@ -28,7 +28,7 @@ interface MemeToken {
 //   relative_time_minutes: number;
 // }
 
-export default function MemeTokenDetail() {
+export default function MemeTokenDetail({ goCampaign }: { goCampaign?: () => void }) {
   const [token, setToken] = useState<MemeToken | null>(null);
   const [loading, setLoading] = useState(true);
   // const [signals] = useState<Signal[]>([]); // 移除未使用的signals变量
@@ -42,7 +42,7 @@ export default function MemeTokenDetail() {
   const timeframes = ['1s', '5s', '30s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'];
   // Add display constants for icon and symbol
   const DISPLAY_SYMBOL = 'PEPE';
-  const DISPLAY_LOGO_URL = '/token_icons/6d34d3d8ae908d910be991d7031f7a3f_v2l.webp';
+  const DISPLAY_LOGO_URL = '/token_icons/21deed59dc9d05f4995f0ee947a9c753b14ca87f3950a4e3fe1ec1c09c8d462c.png';
 
   useEffect(() => {
     fetchTokenData();
@@ -121,19 +121,22 @@ export default function MemeTokenDetail() {
           <div className="xl:col-span-2 space-y-6">
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6">
               <div className="flex items-start gap-4">
-                <img src={DISPLAY_LOGO_URL} alt={DISPLAY_SYMBOL} className="w-16 h-16 rounded-xl" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-2xl font-bold text-white">{DISPLAY_SYMBOL}</h1>
-                    <img
-                      src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png"
-                      alt="Base"
-                      className="w-5 h-5 rounded-full"
-                    />
-                    <span className="px-3 py-1 bg-red-500/20 text-red-400 text-xs font-semibold rounded-full border border-red-500/50">
-                      LIVE
-                    </span>
-                  </div>
+                <div className="relative">
+                  <img src={DISPLAY_LOGO_URL} alt={DISPLAY_SYMBOL} className="w-16 h-16 rounded-xl" />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br from-white via-blue-300 to-blue-600 border border-white/60 shadow-sm" />
+                </div>
+                 <div className="flex-1">
+                   <div className="flex items-center gap-3 mb-2">
+                     <h1 className="text-2xl font-bold text-white">{DISPLAY_SYMBOL}</h1>
+                     <button
+                      aria-label="Open campaign"
+                      onClick={() => goCampaign?.()}
+                      className="px-3 py-1 text-xs font-semibold rounded-full border border-red-500/50 text-red-400 bg-red-500/20 hover:bg-red-500/30 hover:text-red-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      live Campaign
+                      <ArrowRight size={14} />
+                    </button>
+                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <span className="font-mono">{token.contract_address.slice(0, 6)}...{token.contract_address.slice(-4)}</span>
                     <button onClick={copyAddress} className="hover:text-white transition-colors">

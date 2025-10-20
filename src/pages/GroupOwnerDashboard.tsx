@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Users, Award, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
 interface Campaign {
   id: string;
@@ -12,9 +13,10 @@ interface Campaign {
   description: string;
   token_symbol: string;
   token_logo: string;
+  my_reward?: number;
 }
 
-export default function GroupOwnerDashboard() {
+export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () => void }) {
   const [activeTab, setActiveTab] = useState<'commission' | 'campaigns' | 'bot'>('campaigns');
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [selectedCommunity] = useState('币圈猎狗群'); // 移除未使用的setter
@@ -24,30 +26,73 @@ export default function GroupOwnerDashboard() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showWithdrawHistory, setShowWithdrawHistory] = useState(false);
   const [, setIsBotAdded] = useState(false); // 只保留setter用于handleBotAdded函数
+  const [trendData, setTrendData] = useState<{ day: string; commission: number; signals: number }[]>([]);
+  const LEFT_DOMAIN: [number, number] = [10, 100];
+  const RIGHT_DOMAIN: [number, number] = [1, 100];
+  const LEFT_MID = (LEFT_DOMAIN[0] + LEFT_DOMAIN[1]) / 2;
+  const TOKEN_ICONS = [
+    '1d308d6f81c1061b7f58b68745815277.webp',
+    '2fbc4940b6b4966b56511d00f182d56a_v2l.webp',
+    '3c6759fe14393bfc189c14058f158534.webp',
+    '4f87908c85be4d8ccdcec7fbf0acf7f4.webp',
+    'cfc5278dd5286596d30d896d629c87df.webp',
+    '98377fde34fe769bdb3b0a114d6cc6c0.webp',
+    'bf036f40565334545befbef9281d74a7_v2l.webp',
+    'cd68c7bfa7d4b5b8363467c93a052cde.webp',
+    'cda79647be832509d760edd8d80be962.webp',
+    'ce05864f229d1fc421607dd709605508.webp',
+    'dfc123975b99527567e618670fec54a8_v2l.webp',
+    'e34a41abbd659242fb9a20b5c8f97aaf_v2l.webp',
+    'f850788494ba8ad70982fec3c55d0b1f.webp',
+  ] as const;
+  const getIcon = (i: number) => `/token_icons/${TOKEN_ICONS[i % TOKEN_ICONS.length]}`;
 
   useEffect(() => {
     fetchCampaigns();
   }, []);
 
-  const fetchCampaigns = async () => {
-    const { data } = await supabase
-      .from('campaigns')
-      .select('*, meme_tokens(symbol, logo_url)');
+  useEffect(() => {
+    const days = 30;
+    const data = Array.from({ length: days }).map((_, idx) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (days - idx - 1));
+      const commission = parseFloat((10 + Math.random() * 90).toFixed(1));
+      const signals = Math.floor(1 + Math.random() * 99);
+      return {
+        day: `${d.getMonth() + 1}/${d.getDate()}`,
+        commission,
+        signals,
+      };
+    });
+    setTrendData(data);
+  }, []);
 
-    if (data) {
-      const live = data.filter((c: any) => c.status === 'live').map((c: any) => ({
-        ...c,
-        token_symbol: c.meme_tokens?.symbol || '',
-        token_logo: c.meme_tokens?.logo_url || ''
-      }));
-      const past = data.filter((c: any) => c.status === 'past').map((c: any) => ({
-        ...c,
-        token_symbol: c.meme_tokens?.symbol || '',
-        token_logo: c.meme_tokens?.logo_url || ''
-      }));
-      setLiveCampaigns(live);
-      setPastCampaigns(past);
-    }
+  const fetchCampaigns = async () => {
+    const dateISO = (offsetDays: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      return d.toISOString();
+    };
+    const genReward = (nonZero: boolean) => (nonZero ? parseFloat((100.1 + Math.random() * (999.9 - 100.1)).toFixed(1)) : 0);
+
+    const mockLive: Campaign[] = [
+      { id: 'live-1', meme_token_id: 'mt-1', prize_pool: 10000, start_date: dateISO(-5), end_date: dateISO(10), status: 'live', description: 'Trade & earn commission this week.', token_symbol: 'PEPE', token_logo: getIcon(0) },
+      { id: 'live-2', meme_token_id: 'mt-2', prize_pool: 7500, start_date: dateISO(-3), end_date: dateISO(7), status: 'live', description: 'High-volume trading rewards.', token_symbol: 'DOGE', token_logo: getIcon(1) },
+      { id: 'live-3', meme_token_id: 'mt-3', prize_pool: 5200, start_date: dateISO(-10), end_date: dateISO(5), status: 'live', description: 'Signal-based commission campaign.', token_symbol: 'SHIB', token_logo: getIcon(2) },
+    ];
+
+    const mockPast: Campaign[] = [
+      { id: 'past-1', meme_token_id: 'mt-4', prize_pool: 4800, start_date: dateISO(-30), end_date: dateISO(-25), status: 'past', description: 'Weekly past campaign.', token_symbol: 'BONK', token_logo: getIcon(3), my_reward: genReward(false) },
+      { id: 'past-2', meme_token_id: 'mt-5', prize_pool: 3900, start_date: dateISO(-40), end_date: dateISO(-34), status: 'past', description: 'Closed trading campaign.', token_symbol: 'WIF', token_logo: getIcon(4), my_reward: genReward(false) },
+      { id: 'past-3', meme_token_id: 'mt-6', prize_pool: 6200, start_date: dateISO(-50), end_date: dateISO(-43), status: 'past', description: 'Active traders campaign.', token_symbol: 'COQ', token_logo: getIcon(5), my_reward: genReward(false) },
+      { id: 'past-4', meme_token_id: 'mt-7', prize_pool: 3100, start_date: dateISO(-28), end_date: dateISO(-21), status: 'past', description: 'Small prize pool event.', token_symbol: 'BRETT', token_logo: getIcon(6), my_reward: genReward(true) },
+      { id: 'past-5', meme_token_id: 'mt-8', prize_pool: 2500, start_date: dateISO(-22), end_date: dateISO(-16), status: 'past', description: 'Community fun trading.', token_symbol: 'FLOKI', token_logo: getIcon(7), my_reward: genReward(true) },
+      { id: 'past-6', meme_token_id: 'mt-9', prize_pool: 5400, start_date: dateISO(-35), end_date: dateISO(-29), status: 'past', description: 'Momentum strategy event.', token_symbol: 'TURBO', token_logo: getIcon(8), my_reward: genReward(true) },
+      { id: 'past-7', meme_token_id: 'mt-10', prize_pool: 4300, start_date: dateISO(-60), end_date: dateISO(-53), status: 'past', description: 'Volume-based rewards.', token_symbol: 'MEW', token_logo: getIcon(9), my_reward: genReward(true) },
+    ];
+
+    setLiveCampaigns(mockLive);
+    setPastCampaigns(mockPast);
   };
 
   const handleTelegramLogin = () => {
@@ -205,8 +250,22 @@ export default function GroupOwnerDashboard() {
 
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-6">Commission & Signal Trends</h3>
-              <div className="h-[400px] flex items-center justify-center text-slate-500">
-                <TrendingUp size={48} className="opacity-20" />
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={trendData.map(d => ({ ...d, commissionCapped: Math.min(d.commission, LEFT_MID) }))} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="day" tick={{ fill: '#94a3b8' }} />
+                    <YAxis yAxisId="left" domain={LEFT_DOMAIN} tick={{ fill: '#94a3b8' }} />
+                    <YAxis yAxisId="right" orientation="right" domain={RIGHT_DOMAIN} tick={{ fill: '#94a3b8' }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#e2e8f0' }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="commissionCapped" name="Commission ($)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="signals" name="Signals" stroke="#A472DA" strokeWidth={2} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
@@ -291,7 +350,7 @@ export default function GroupOwnerDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+                      <button onClick={() => goCampaign?.()} className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
                         View
                       </button>
                       <button className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
@@ -320,8 +379,14 @@ export default function GroupOwnerDashboard() {
                       </div>
                     </div>
                     <p className="text-sm text-slate-400 mb-4">{campaign.description}</p>
-                    <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
-                      View Results
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">我的奖励:</span>
+                        <span className={campaign.my_reward ? 'text-emerald-400 font-medium' : 'text-slate-400'}>{campaign.my_reward ? `$${campaign.my_reward.toLocaleString()}` : '$0.0'}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => goCampaign?.()} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+                      View
                     </button>
                   </div>
                 )) : (
