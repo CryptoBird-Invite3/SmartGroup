@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TrendingUp, DollarSign, Users, Award, ChevronDown } from 'lucide-react';
 // 移除未使用的 supabase 导入
 // import { supabase } from '../lib/supabase';
@@ -181,69 +181,232 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
     );
   }
 
-  // AI Chat Tab: lazy-load SDK script and init widget
+  // AI Chat Tab: Embedded full-screen chat interface
   function AIChatTab() {
+    const [messages, setMessages] = useState<Array<{id: string; type: 'user' | 'bot'; content: string; timestamp: Date}>>([]);
+    const [inputValue, setInputValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
     useEffect(() => {
-      let isMounted = true;
-      const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = (e) => reject(e);
-        document.body.appendChild(s);
-      });
-      const initWidget = () => {
+      scrollToBottom();
+    }, [messages]);
+
+    useEffect(() => {
+      // Load chat history from localStorage
+      const savedMessages = localStorage.getItem('ai-chat-history');
+      if (savedMessages) {
         try {
-          const w: any = window as any;
-          const WidgetCtor = w.AIChatWidget || w.ChatSnailWidget || w.ChatSnailSDK;
-          if (!WidgetCtor) {
-            console.error('AI Chat SDK 未找到构造函数');
-            return;
-          }
-          const widget = new WidgetCtor({
-            theme: 'dark',
-            language: 'zh',
-            position: 'bottom-right',
-            title: 'AI Chat',
-            subtitle: '群助手 / 智能问答',
-            welcomeMessage: '你好！我是群助手，有什么可以帮你？',
-            primaryColor: '#A472DA',
-          });
-          widget.init?.();
-          console.log('AI Chat SDK 初始化成功');
+          const parsed = JSON.parse(savedMessages);
+          setMessages(parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          })));
         } catch (e) {
-          console.error('AI Chat SDK 初始化失败:', e);
+          console.error('Failed to load chat history:', e);
         }
-      };
-      (async () => {
-        try {
-          console.log('尝试加载 chat-snail-sdk');
-          await loadScript('https://unpkg.com/chat-snail-sdk@latest/dist/widget.min.js');
-          if (!isMounted) return;
-          initWidget();
-        } catch (e1) {
-          console.warn('chat-snail-sdk 加载失败，尝试备用 SDK', e1);
-          try {
-            console.log('尝试加载 ai-chat-widget-sdk');
-            await loadScript('https://unpkg.com/ai-chat-widget-sdk@latest/dist/widget.min.js');
-            if (!isMounted) return;
-            initWidget();
-          } catch (e2) {
-            console.error('备用 SDK 加载失败：', e2);
-          }
-        }
-      })();
-      return () => { isMounted = false; };
+      }
     }, []);
 
+    useEffect(() => {
+      // Save chat history to localStorage
+      if (messages.length > 0) {
+        localStorage.setItem('ai-chat-history', JSON.stringify(messages));
+      }
+    }, [messages]);
+
+    const sendMessage = async () => {
+      if (!inputValue.trim() || isLoading) return;
+
+      const userMessage = {
+        id: Date.now().toString(),
+        type: 'user' as const,
+        content: inputValue.trim(),
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+      setIsLoading(true);
+
+      try {
+        // Call Dify API
+        const response = await fetch(`${import.meta.env.VITE_DIFY_BASE_URL}/v1/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_DIFY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: {},
+            query: userMessage.content,
+            response_mode: 'blocking',
+            user: import.meta.env.VITE_DIFY_USER || 'default-user',
+            conversation_id: localStorage.getItem('dify-conversation-id') || undefined
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Save conversation ID for context
+        if (data.conversation_id) {
+          localStorage.setItem('dify-conversation-id', data.conversation_id);
+        }
+
+        const botMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot' as const,
+          content: data.answer || '抱歉，我现在无法回答。',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        const errorMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot' as const,
+          content: '抱歉，发送消息失败。请检查网络连接或稍后再试。',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+
+    const clearHistory = () => {
+      if (confirm('确定要清除所有对话历史吗？')) {
+        setMessages([]);
+        localStorage.removeItem('ai-chat-history');
+        localStorage.removeItem('dify-conversation-id');
+      }
+    };
+
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-8 text-white">
-          <h2 className="text-2xl font-bold mb-2">AI Chat</h2>
-          <p className="text-slate-300 mb-4">已集成聊天 SDK。点击右下角悬浮按钮打开对话。</p>
-          <div className="text-sm text-slate-400">
-            如未看到悬浮按钮，请检查控制台日志或网络拦截，并确保允许从 unpkg CDN 加载脚本。
+      <div className="h-[calc(100vh-12rem)] flex flex-col bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-xl">🤖</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">AI 群助手</h2>
+              <p className="text-xs text-slate-400">智能问答 · 随时为您服务</p>
+            </div>
+          </div>
+          <button
+            onClick={clearHistory}
+            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+          >
+            清除历史
+          </button>
+        </div>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">💬</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">开始对话</h3>
+                <p className="text-slate-400 text-sm">
+                  你好！我是 AI 群助手，有什么可以帮你？
+                </p>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`flex gap-3 max-w-[80%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    msg.type === 'user' ? 'bg-emerald-500/20' : 'bg-slate-700'
+                  }`}>
+                    <span className="text-sm">{msg.type === 'user' ? '👤' : '🤖'}</span>
+                  </div>
+                  <div>
+                    <div className={`rounded-2xl px-4 py-3 ${
+                      msg.type === 'user'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-800 text-slate-100'
+                    }`}>
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 px-2">
+                      {msg.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex gap-3 max-w-[80%]">
+                <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">🤖</span>
+                </div>
+                <div className="bg-slate-800 rounded-2xl px-4 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="px-6 py-4 border-t border-slate-800">
+          <div className="flex gap-2">
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
+              className="flex-1 bg-slate-800 text-white rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              rows={1}
+              style={{ minHeight: '44px', maxHeight: '120px' }}
+              disabled={isLoading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!inputValue.trim() || isLoading}
+              className="px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+            >
+              {isLoading ? (
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+              ) : (
+                <span>发送</span>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -582,6 +745,8 @@ export default function GroupOwnerDashboard({ goCampaign }: { goCampaign?: () =>
             </div>
           </div>
         )}
+
+        {activeTab === 'chat' && <AIChatTab />}
       </div>
 
       {showWithdrawModal && (
